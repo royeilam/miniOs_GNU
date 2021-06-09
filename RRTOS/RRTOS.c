@@ -26,13 +26,17 @@
 #define MAX_NUM_TASKS       32U
 
 /********************************************************************************
+ * Prototypes
+ ********************************************************************************/
+void rrtos_switchCtx(uint32_t ** const from, uint32_t ** const to);
+/********************************************************************************
  * Locals
  ********************************************************************************/
 static rrtosTaskData_t * taskList[MAX_NUM_TASKS] = { 0 };
 static uint32_t          readyQ     = 0;
 static uint32_t          blockedQ   = 0;
-static rrtosTaskData_t * curTask    = NULL;
-static rrtosTaskData_t * nextTask   = NULL;
+rrtosTaskData_t * curTask    = NULL;
+rrtosTaskData_t * nextTask   = NULL;
 // Background Task Data
 static rrtosTaskData_t IdleTaskData = { 0 };
 static uint32_t IdleTaskStack[STACK_SIZE+8] = { 0 };
@@ -142,43 +146,6 @@ void SysTick_Handler (void)
     onTick();
     scheduler();
     __enable_irq();
-}
-
-// Using the PendSV to do the actual context switch
-void PendSV_Handler(void)
-{
-    if(curTask != NULL)
-    {
-        // 1. Load the curTask->stack pointer to R1
-        __asm(" ldr      r1,=curTask");
-        __asm(" ldr      r1,[r1]");
-        // 2. Push R4 through R11 to the stack
-        __asm(" push     {r4-r11}");
-        // If Process was halted with FP operation, store s16-s31
-        __asm(" tst      lr, 0x10");
-        __asm(" bne      1f");
-        __asm(" vpush    {s16-s31}");
-        __asm("1:");
-        // Store LR to indicate if process was halted during FP operation
-        __asm(" push     {lr}");
-        // 3. Store the current stack pointer to curTask->stack
-        __asm(" str      sp, [r1]");
-    }
-    // 4. Load the next task stack pointer address to R1
-    __asm(" ldr      r1,=nextTask");
-    __asm(" ldr      r1,[r1]");
-    // 5. Change stack pointer to nextTask->stack
-    __asm(" ldr      sp, [r1]");
-    // 6. Pop R4 through R11 from stack
-    __asm(" pop      {lr}");
-    // If LR indicate that FP operation was interrupted, than
-    // stack contains FP registers
-    __asm(" tst      lr, 0x10");
-    __asm(" bne      2f");
-    __asm(" vpop     {s16-s31}");
-    __asm("2:");
-    __asm(" pop      {r4-r11}");
-    curTask = nextTask;
 }
 
 void IdleTask(void)
