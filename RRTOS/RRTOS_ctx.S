@@ -11,38 +11,58 @@
     \name:
 .endm
 
+.data
+curTask_sp_p: 
+.word 0x0
+nextTask_sp_p:
+.word 0x0
 
+.text
+// breif:    Set the data for the context switch
+// param r0: Pointer to the current task
+//           Stack Pointer
+// param r1: Pointer to the next task
+//           Stack Pointer
+funct rrtos_prepCtx
+    ldr     r3, =curTask_sp_p
+    str     r0, [r3]
+    ldr     r3, =nextTask_sp_p
+    str     r1, [r3]
+    bx		lr
+
+// brief:   Perform the actual context switch
 funct PendSV_Handler
+	curPSP		.req r0
+	nextPSP		.req r1
     @ 1. Load the curTask->stack pointer to R0
-    ldr     r0, =curTask
-    ldr     r2, [r0]
-    cbz     r2, 2f
-    @ 2. Push R4 through R11 to the stack
-    push    {r4-r11}
+    ldr     	r0, =curTask_sp_p
+    ldr     	r2, [r0]
+    cbz     	r2, PendSV_LoadNewCtx
+    @ 2. Load Process Stack Pointer to curPSP
+    mrs			curPSP, psp
+    @ 3. Push R4 through R11 to curPSP
+    stmdb  		curPSP!, {r4-r11}
     @ If process was halted with FP operation, store s16-s31
-    tst     lr, 0x10
-    bne     1f
-    vpush   {s16-s31}
-    1:
-    @ 3. Store LR to indicate if process was halted during FP operation
-    push    {lr}
-    @ 4. Save current Stack Pointer to Tasks Data structure
-    str     sp, [r2]
-    2:
-    @ 5. Load the next task stack pointer address to R1
-    ldr     r1, =nextTask
-    ldr     r2, [r1]
-    @ 6. Change stack pointer to nextTask->stack
-    ldr     sp, [r2]
+    tst     	lr, 0x10
+    it      	eq
+    vstmdbeq  	curPSP!, {s16-s31}
+    @ 4. Store LR to indicate if process was halted during FP operation
+    stmdb  		curPSP!, {lr}
+    @ 5. Save curPSP to Tasks Data structure
+    str			curPSP, [r2]
+    PendSV_LoadNewCtx:
+    @ 6. Load the next task stack pointer address to R1
+    ldr     	r1, =nextTask_sp_p
+    ldr     	r1, [r1]
+    ldr     	nextPSP, [r1]
     @ Check if next process was in the middle of FP operation
-    pop     {lr}
-    tst     lr, 0x10
-    bne     3f
-    vpop    {s16-s31}
-    3:
-    @ 7. Pop R4 through R11 from stack
-    pop     {r4-r11}
-    @ curTask = nextTask
-    str     r2, [r0]
+    ldmia		nextPSP!, {lr}
+    tst     	lr, 0x10
+    it	     	eq
+    vldmiaeq   	nextPSP!, {s16-s31}
+    @ 7. Pop R4 through R11 from nextPSP
+    ldmia     	nextPSP!, {r4-r11}
+    @ 8. change psp to nextPSP
+    msr			psp, nextPSP
     @ Exit function
-    bx      lr
+    bx      	lr

@@ -97,8 +97,8 @@ int msp432_gpioInit(msp432_gpio_port_e port,
         case LONG_PORT:
         {
             // Setting IO direction
-            regs->NON_INTR.PADIR &= ~(mask);
-            regs->NON_INTR.PADIR |= dir << gpio;
+            regs->NON_INTR.PADIR  &= ~(mask);
+            regs->NON_INTR.PADIR  |= dir << gpio;
             // Change alternate function
             regs->NON_INTR.PASEL0 &= ~(mask);
             regs->NON_INTR.PASEL1 &= ~(mask);

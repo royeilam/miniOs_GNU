@@ -10,7 +10,7 @@
 /********************************************************************************
  * Defines
  ********************************************************************************/
-#define MY_TEST_STACK_SIZE 512+8
+#define MY_TEST_STACK_SIZE 512
 /********************************************************************************
  * Locals
  ********************************************************************************/
@@ -18,8 +18,9 @@ static msp432_gpio_port_e port = MSP432_LED_PORT;
 static uint8_t gpio[2] = {MSP432_LED_BLUE, MSP432_LED_GREEN};
 static rrtosTaskData_t myTestTaskData[2];
 static rrtosTaskData_t myFloatTaskData;
-static uint32_t myTestTaskStack[2][MY_TEST_STACK_SIZE] = {0};
-static uint32_t myFloatTaskStack[MY_TEST_STACK_SIZE] = {0};
+RRTOS_CREATE_STACK(MY_TEST_STACK_SIZE, task1Stack)
+RRTOS_CREATE_STACK(MY_TEST_STACK_SIZE, task2Stack)
+RRTOS_CREATE_STACK(MY_TEST_STACK_SIZE, floatTaskStack)
 
 void myTestTask1(void)
 {
@@ -69,19 +70,16 @@ int main(void)
 
     rrtosTaskInit(&(myTestTaskData[0]),
                   myTestTask1,
-                  1,
-                  &(myTestTaskStack[0][0]),
-                  MY_TEST_STACK_SIZE);
+                  0,
+                  task1Stack);
     rrtosTaskInit(&(myTestTaskData[1]),
                   myTestTask2,
-                  2,
-                  &(myTestTaskStack[1][0]),
-                  MY_TEST_STACK_SIZE);
+                  1,
+                  task2Stack);
      rrtosTaskInit(&(myFloatTaskData),
                   myFloatTask,
-                  3,
-                  &(myFloatTaskStack[0]),
-                  MY_TEST_STACK_SIZE);
+                  2,
+                  floatTaskStack);
     rrtosInit();
 
     return 0;
